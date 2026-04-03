@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: f73e5f2abc758ec41a935e3a2721c48d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 282789
+  packageName: KayKit - Furniture Bits (for Unity)
+  packageVersion: 1.0.0
+  assetPath: Assets/KayKit/Packs/Bits/KayKit - Furniture Bits (For Unity)/Materials/furniture_texture_alt_C.mat
+  uploadId: 814520
