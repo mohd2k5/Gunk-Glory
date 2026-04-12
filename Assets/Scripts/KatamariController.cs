@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.Netcode;
+using TMPro;
 
 [RequireComponent(typeof(Rigidbody))]
 [RequireComponent(typeof(SphereCollider))]
@@ -17,7 +18,7 @@ public class KatamariController : NetworkBehaviour
     private Vector2 moveInput;
     private Vector2 lookInput;
 
-    private float katamariSize;
+    public float katamariSize;
 
     [Header("Pickup Settings")]
     public int maxObjCount = 20;
@@ -27,6 +28,15 @@ public class KatamariController : NetworkBehaviour
 
     [SerializeField] private GameObject primObj;
     private GameObject lastPickedObject;
+
+
+
+    public NetworkVariable<int> Score = new NetworkVariable<int>(0, 
+        NetworkVariableReadPermission.Everyone, 
+        NetworkVariableWritePermission.Owner);
+
+    public TextMeshPro scoreText;
+
 
 private PlayerInput playerInput;
 
@@ -62,6 +72,8 @@ public override void OnNetworkSpawn()
 
     private void Update()
     {
+        scoreText.text = Score.Value.ToString();
+
         if (!IsOwner)
             return;
 
@@ -158,11 +170,14 @@ public override void OnNetworkSpawn()
         if (stick == null)
             return;
 
+        if(stick.isStick.Value == true)
+            return;
+
         float objColSize = stick.size;
 
         if (objColSize < katamariSize)
         {
-            collision.transform.SetParent(transform);
+            stick.TransferOwnershipServerRPC(OwnerClientId, NetworkObjectId);
 
             Rigidbody otherRb = collision.gameObject.GetComponent<Rigidbody>();
             if (otherRb != null)
@@ -177,6 +192,8 @@ public override void OnNetworkSpawn()
 
             katamariCollider.radius += objColSize / 50f;
             objCount += 1;
+
+            Score.Value = objCount;
         }
     }
 }
