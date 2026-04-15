@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.Netcode;
+using Unity.Collections;
 using TMPro;
 
 [RequireComponent(typeof(Rigidbody))]
@@ -35,7 +36,16 @@ public class KatamariController : NetworkBehaviour
         NetworkVariableReadPermission.Everyone, 
         NetworkVariableWritePermission.Owner);
 
+
+public NetworkVariable<FixedString64Bytes> Name = new NetworkVariable<FixedString64Bytes>(
+    default,
+    NetworkVariableReadPermission.Everyone,
+    NetworkVariableWritePermission.Owner
+);
+
     public TextMeshPro scoreText;
+    public TextMeshPro nameText;
+
 
 
 private PlayerInput playerInput;
@@ -49,6 +59,8 @@ private void Awake()
 
 public override void OnNetworkSpawn()
 {
+    NetworkManager.Singleton.GetComponent<PlayersList>().players.Add(gameObject);
+
     if (playerInput != null)
         playerInput.enabled = IsOwner;
 
@@ -68,14 +80,21 @@ public override void OnNetworkSpawn()
         pickedObjects.Add(primObj);
         lastPickedObject = primObj;
     }
+
 }
 
     private void Update()
     {
+
         scoreText.text = Score.Value.ToString();
+        nameText.text = Name.Value.ToString();
+
 
         if (!IsOwner)
             return;
+
+        Name.Value = new FixedString64Bytes(LocalDataSingleton.Instance.playerName);
+        
 
 
         Debug.Log("Yes");
