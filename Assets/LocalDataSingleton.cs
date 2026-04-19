@@ -3,6 +3,7 @@ using UnityEngine;
 public class LocalDataSingleton : MonoBehaviour
 {
     public static LocalDataSingleton Instance { get; private set; }
+    public GameObject[] SpawnPlatforms;
 
     public string playerName;
 

@@ -4,9 +4,9 @@ using UnityEngine.InputSystem;
 using Unity.Netcode;
 using Unity.Collections;
 using TMPro;
+using Unity.Netcode.Components;
 
-[RequireComponent(typeof(Rigidbody))]
-[RequireComponent(typeof(SphereCollider))]
+
 public class KatamariController : NetworkBehaviour
 {
     [Header("Movement")]
@@ -46,6 +46,12 @@ public NetworkVariable<FixedString64Bytes> Name = new NetworkVariable<FixedStrin
     public TextMeshPro scoreText;
     public TextMeshPro nameText;
 
+    
+    public NetworkVariable<bool> isStick = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
 
 
 private PlayerInput playerInput;
@@ -80,11 +86,18 @@ public override void OnNetworkSpawn()
         pickedObjects.Add(primObj);
         lastPickedObject = primObj;
     }
+    
+    playerInput.enabled = false;
+    transform.position =
+        LocalDataSingleton.Instance.SpawnPlatforms[(int)NetworkManager.Singleton.LocalClientId].transform.position +
+        Vector3.up * 1.5f;
+
 
 }
 
     private void Update()
     {
+
 
         scoreText.text = Score.Value.ToString();
         nameText.text = Name.Value.ToString();
@@ -184,35 +197,92 @@ public override void OnNetworkSpawn()
     {
         if (!IsOwner)
             return;
+        
+        
 
         KatamariStick stick = collision.gameObject.GetComponent<KatamariStick>();
-        if (stick == null)
-            return;
-
-        if(stick.isStick.Value == true)
-            return;
-
-        float objColSize = stick.size;
-
-        if (objColSize < katamariSize)
+        KatamariController controller = collision.gameObject.GetComponent<KatamariController>();
+        if (stick != null)
         {
-            stick.TransferOwnershipServerRPC(OwnerClientId, NetworkObjectId);
+            if(stick.isStick.Value == true)
+                return;
 
-            Rigidbody otherRb = collision.gameObject.GetComponent<Rigidbody>();
-            if (otherRb != null)
+            float objColSize = stick.size;
+
+            if (objColSize < katamariSize)
             {
-                otherRb.isKinematic = true;
-                otherRb.useGravity = false;
-                otherRb.detectCollisions = false;
+                stick.TransferOwnershipServerRPC(OwnerClientId, NetworkObjectId);
+
+                Rigidbody otherRb = collision.gameObject.GetComponent<Rigidbody>();
+                if (otherRb != null)
+                {
+                    otherRb.isKinematic = true;
+                    otherRb.useGravity = false;
+                    otherRb.detectCollisions = false;
+                }
+
+                pickedObjects.Add(collision.gameObject);
+                lastPickedObject = collision.gameObject;
+
+                katamariCollider.radius += objColSize / 50f;
+                objCount += 1;
+
+                Score.Value = objCount;
             }
+        }
 
-            pickedObjects.Add(collision.gameObject);
-            lastPickedObject = collision.gameObject;
+        if (controller != null)
+        {
+            if(controller.isStick.Value == true)
+                return;
+            
 
-            katamariCollider.radius += objColSize / 50f;
-            objCount += 1;
+            if (Score.Value > controller.Score.Value)
+            {
+                controller.TransferOwnershipServerRPC(OwnerClientId, NetworkObjectId);
 
-            Score.Value = objCount;
+                collision.gameObject.GetComponent<KatamariController>().enabled = false;
+                Destroy(collision.gameObject.GetComponent<Rigidbody>());
+                collision.gameObject.GetComponent<Collider>().enabled = false;
+                collision.gameObject.GetComponent<PlayerInput>().enabled = false;
+                
+                pickedObjects.Add(collision.gameObject);
+                lastPickedObject = collision.gameObject;
+
+                for (int i = 0; i < collision.transform.childCount; i++)
+                {
+                    if (collision.transform.GetChild(i).GetComponent<KatamariStick>() != null ||collision.transform.GetChild(i).GetComponent<KatamariController>())
+                    {
+                        collision.transform.GetChild(i).parent = transform;
+                    }
+                }
+                katamariCollider.radius += controller.Score.Value / 50f;
+                objCount += controller.Score.Value;
+
+                Score.Value = objCount;
+            }
+        }
+     
+
+        
+    }
+    
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    public void TransferOwnershipServerRPC(ulong newOwnerId, ulong parentId)
+    {
+        var netObj = GetComponent<NetworkObject>();
+
+        if (netObj != null)
+        {
+            netObj.ChangeOwnership(newOwnerId);
+
+            var parentObj = NetworkManager.Singleton.SpawnManager.SpawnedObjects[parentId];
+            netObj.TrySetParent(parentObj);
+
+            isStick.Value = true;
         }
     }
+    
+    
+    
 }

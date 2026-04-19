@@ -6,7 +6,7 @@ public class NetworkFreeLook : MonoBehaviour
 {
     public static NetworkFreeLook Instance { get; private set; }
 
-    Transform localPlayer;
+    public Transform wathcingPlayer;
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -19,13 +19,14 @@ public class NetworkFreeLook : MonoBehaviour
 
     void Start()
     {
-        localPlayer = null;
+        wathcingPlayer = null;
     }
 
     public void SetLocalPlayer(Transform p)
     {
-        localPlayer = p;
+        wathcingPlayer = p;
         GetComponent<CinemachineCamera>().Follow = p;
         GetComponent<CinemachineCamera>().LookAt = p;
     }
+    
 }

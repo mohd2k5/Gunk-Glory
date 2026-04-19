@@ -10,9 +10,12 @@ public class ScoreLeaderboard : NetworkBehaviour
     public TextMeshProUGUI second;
     public TextMeshProUGUI third;
 
+    private List<GameObject> playersList;
     void Update()
     {
-        var playersList = NetworkManager.Singleton.GetComponent<PlayersList>().players;
+        
+        if(NetworkManager.Singleton != null)
+            playersList = NetworkManager.Singleton.GetComponent<PlayersList>().players;
 
         if (playersList == null || playersList.Count == 0)
             return;
