@@ -285,8 +285,8 @@ public class KatamariController : NetworkBehaviour
             ObjectCount++;
         }
 
-        transform.localScale += Vector3.one * otherController.Score.Value;
-        Score.Value += 0.25f;
+        transform.localScale += Vector3.one * pickupScaleIncrease;
+        Score.Value += otherController.Score.Value;
     }
 
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
@@ -304,14 +304,21 @@ public class KatamariController : NetworkBehaviour
             return;
         }
 
+        NetworkTransform networkTransform = GetComponent<NetworkTransform>();
+
+        if (playerInput != null)
+        {
+            playerInput.enabled = false;
+        }
+
         if (networkRigidbody != null)
         {
             networkRigidbody.enabled = false;
         }
 
-        if (playerInput != null)
+        if (networkTransform != null)
         {
-            playerInput.enabled = false;
+            networkTransform.enabled = false;
         }
 
         if (rb != null)
@@ -329,11 +336,7 @@ public class KatamariController : NetworkBehaviour
             colliderComponent.enabled = false;
         }
 
-        networkObjectComponent.ChangeOwnership(newOwnerId);
         networkObjectComponent.TrySetParent(parentObject, true);
-
-        transform.localRotation = Quaternion.identity;
-
         isStick.Value = true;
     }
 
