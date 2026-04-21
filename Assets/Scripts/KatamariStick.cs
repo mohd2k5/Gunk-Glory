@@ -172,16 +172,11 @@ public class KatamariStick : NetworkBehaviour
             return;
         }
 
-        NetworkTransform networkTransform = GetComponent<NetworkTransform>();
-
-        if (networkRigidbody != null)
+        bool parented = networkObjectComponent.TrySetParent(parentObject, true);
+        if (!parented)
         {
-            networkRigidbody.enabled = false;
-        }
-
-        if (networkTransform != null)
-        {
-            networkTransform.enabled = false;
+            Debug.LogWarning($"{name} failed to parent to {parentObject.name}");
+            return;
         }
 
         if (rb != null)
@@ -194,12 +189,16 @@ public class KatamariStick : NetworkBehaviour
             rb.constraints = RigidbodyConstraints.FreezeAll;
         }
 
+        if (networkRigidbody != null)
+        {
+            networkRigidbody.enabled = false;
+        }
+
         if (cachedCollider != null)
         {
             cachedCollider.enabled = false;
         }
 
-        networkObjectComponent.TrySetParent(parentObject, true);
         isStick.Value = true;
     }
 }

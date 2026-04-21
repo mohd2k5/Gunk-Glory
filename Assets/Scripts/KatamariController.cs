@@ -19,7 +19,7 @@ public class KatamariController : NetworkBehaviour
     [Header("Pickup Settings")]
     [SerializeField] private GameObject primObj;
     [SerializeField] private float pickupScaleIncrease = 0.05f;
-    [SerializeField] private float minPlayerScoreDifferenceToAbsorb = 1f;
+    [SerializeField] private float minPlayerScoreDifferenceToAbsorb = 0.5f;
 
     [Header("UI")]
     [SerializeField] private TextMeshPro scoreText;
@@ -63,11 +63,6 @@ public class KatamariController : NetworkBehaviour
     {
         RegisterWithPlayersList();
 
-        if (playerInput != null)
-        {
-            playerInput.enabled = false;
-        }
-
         if (primObj != null && !pickedObjects.Contains(primObj))
         {
             pickedObjects.Add(primObj);
@@ -75,6 +70,11 @@ public class KatamariController : NetworkBehaviour
 
         if (!IsOwner)
         {
+            if (playerInput != null)
+            {
+                playerInput.enabled = false;
+            }
+
             return;
         }
 
@@ -228,7 +228,7 @@ public class KatamariController : NetworkBehaviour
         }
 
         transform.localScale += Vector3.one * pickupScaleIncrease;
-        Score.Value += 0.25f;
+        Score.Value = KatamariSize;
     }
 
     private void TryAbsorbPlayer(KatamariController otherController, GameObject otherObject)
@@ -248,36 +248,7 @@ public class KatamariController : NetworkBehaviour
             return;
         }
 
-        List<Transform> childSnapshot = new();
-        for (int i = 0; i < otherObject.transform.childCount; i++)
-        {
-            Transform child = otherObject.transform.GetChild(i);
-            if (child != null)
-            {
-                childSnapshot.Add(child);
-            }
-        }
-
         otherController.TransferOwnershipServerRPC(OwnerClientId, NetworkObjectId);
-
-        foreach (Transform child in childSnapshot)
-        {
-            if (child == null || child.parent != otherObject.transform)
-            {
-                continue;
-            }
-
-            if (child.TryGetComponent(out KatamariStick childStick))
-            {
-                childStick.TransferOwnershipServerRPC(OwnerClientId, NetworkObjectId);
-                continue;
-            }
-
-            if (child.TryGetComponent(out KatamariController childController) && childController != this && childController != otherController)
-            {
-                childController.TransferOwnershipServerRPC(OwnerClientId, NetworkObjectId);
-            }
-        }
 
         if (!pickedObjects.Contains(otherObject))
         {
@@ -285,8 +256,8 @@ public class KatamariController : NetworkBehaviour
             ObjectCount++;
         }
 
-        transform.localScale += Vector3.one * pickupScaleIncrease;
-        Score.Value += otherController.Score.Value;
+        transform.localScale += Vector3.one * otherController.Score.Value;
+        Score.Value = KatamariSize;
     }
 
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
@@ -304,21 +275,16 @@ public class KatamariController : NetworkBehaviour
             return;
         }
 
-        NetworkTransform networkTransform = GetComponent<NetworkTransform>();
-
         if (playerInput != null)
         {
             playerInput.enabled = false;
         }
 
-        if (networkRigidbody != null)
+        bool parented = networkObjectComponent.TrySetParent(parentObject, true);
+        if (!parented)
         {
-            networkRigidbody.enabled = false;
-        }
-
-        if (networkTransform != null)
-        {
-            networkTransform.enabled = false;
+            Debug.LogWarning($"{name} failed to parent to {parentObject.name}");
+            return;
         }
 
         if (rb != null)
@@ -331,12 +297,16 @@ public class KatamariController : NetworkBehaviour
             rb.constraints = RigidbodyConstraints.FreezeAll;
         }
 
+        if (networkRigidbody != null)
+        {
+            networkRigidbody.enabled = false;
+        }
+
         if (TryGetComponent(out Collider colliderComponent))
         {
             colliderComponent.enabled = false;
         }
 
-        networkObjectComponent.TrySetParent(parentObject, true);
         isStick.Value = true;
     }
 
