@@ -33,6 +33,19 @@ public class UIManager : NetworkBehaviour
     
     
     public List<GameObject> windows = new List<GameObject>();
+    
+    
+    public static UIManager Instance { get; private set; }
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+    }
 
     void Start()
     {
@@ -78,7 +91,7 @@ public class UIManager : NetworkBehaviour
 
     public void StartHost()
     {
-        NetworkManager.Singleton.StartHost();
+        RelayConnect.Instance.CreateRelay();
         SetWindow(waitingMenu);
         LocalDataSingleton.Instance.playerName = playerNameInput.text;
         
@@ -86,7 +99,7 @@ public class UIManager : NetworkBehaviour
 
     public void StartClient()
     {
-        NetworkManager.Singleton.StartClient();
+        RelayConnect.Instance.JoinRelay();
         SetWindow(waitingMenu);
         LocalDataSingleton.Instance.playerName = playerNameInput.text;
     }
