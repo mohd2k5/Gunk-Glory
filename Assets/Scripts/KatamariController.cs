@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using Unity.Collections;
 using Unity.Netcode;
+using Unity.Netcode.Components;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -18,7 +19,7 @@ public class KatamariController : NetworkBehaviour
     [Header("Pickup Settings")]
     [SerializeField] private GameObject primObj;
     [SerializeField] private float pickupScaleIncrease = 0.05f;
-    [SerializeField] private float minPlayerScoreDifferenceToAbsorb = 1f;
+    [SerializeField] private float minPlayerScoreDifferenceToAbsorb = 0.5f;
 
     [Header("UI")]
     [SerializeField] private TextMeshPro scoreText;
@@ -28,7 +29,7 @@ public class KatamariController : NetworkBehaviour
         2f,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Owner);
-    
+
     public NetworkVariable<FixedString64Bytes> Name = new(
         default,
         NetworkVariableReadPermission.Everyone,
@@ -45,6 +46,7 @@ public class KatamariController : NetworkBehaviour
     private readonly List<GameObject> pickedObjects = new();
 
     private Rigidbody rb;
+    private NetworkRigidbody networkRigidbody;
     private PlayerInput playerInput;
     private Vector2 moveInput;
     private Vector2 lookInput;
@@ -53,7 +55,10 @@ public class KatamariController : NetworkBehaviour
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        networkRigidbody = GetComponent<NetworkRigidbody>();
         playerInput = GetComponent<PlayerInput>();
+
+        minPlayerScoreDifferenceToAbsorb = 0.5f;
     }
 
     public override void OnNetworkSpawn()
@@ -240,22 +245,29 @@ public class KatamariController : NetworkBehaviour
             return;
         }
 
-        if ((Score.Value - otherController.Score.Value) < minPlayerScoreDifferenceToAbsorb)
+        if ((Score.Value - otherController.Score.Value) < 0.5f)
         {
             return;
         }
 
-        otherController.TransferOwnershipServerRPC(OwnerClientId, NetworkObjectId);
-
-        if (!pickedObjects.Contains(otherObject))
-        {
-            pickedObjects.Add(otherObject);
-            ObjectCount++;
-        }
-
+        List<Transform> childSnapshot = new();
         for (int i = 0; i < otherObject.transform.childCount; i++)
         {
             Transform child = otherObject.transform.GetChild(i);
+            if (child != null)
+            {
+                childSnapshot.Add(child);
+            }
+        }
+
+        otherController.TransferOwnershipServerRPC(OwnerClientId, NetworkObjectId);
+
+        foreach (Transform child in childSnapshot)
+        {
+            if (child == null || child.parent != otherObject.transform)
+            {
+                continue;
+            }
 
             if (child.TryGetComponent(out KatamariStick childStick))
             {
@@ -263,10 +275,16 @@ public class KatamariController : NetworkBehaviour
                 continue;
             }
 
-            if (child.TryGetComponent(out KatamariController childController) && childController != this)
+            if (child.TryGetComponent(out KatamariController childController) && childController != this && childController != otherController)
             {
                 childController.TransferOwnershipServerRPC(OwnerClientId, NetworkObjectId);
             }
+        }
+
+        if (!pickedObjects.Contains(otherObject))
+        {
+            pickedObjects.Add(otherObject);
+            ObjectCount++;
         }
 
         transform.localScale += Vector3.one * otherController.Score.Value;
@@ -288,12 +306,9 @@ public class KatamariController : NetworkBehaviour
             return;
         }
 
-        networkObjectComponent.ChangeOwnership(newOwnerId);
-        networkObjectComponent.TrySetParent(parentObject, true);
-
-        if (TryGetComponent(out Collider colliderComponent))
+        if (networkRigidbody != null)
         {
-            colliderComponent.enabled = false;
+            networkRigidbody.enabled = false;
         }
 
         if (playerInput != null)
@@ -308,7 +323,18 @@ public class KatamariController : NetworkBehaviour
             rb.isKinematic = true;
             rb.useGravity = false;
             rb.detectCollisions = false;
+            rb.constraints = RigidbodyConstraints.FreezeAll;
         }
+
+        if (TryGetComponent(out Collider colliderComponent))
+        {
+            colliderComponent.enabled = false;
+        }
+
+        networkObjectComponent.ChangeOwnership(newOwnerId);
+        networkObjectComponent.TrySetParent(parentObject, true);
+
+        transform.localRotation = Quaternion.identity;
 
         isStick.Value = true;
     }
@@ -339,7 +365,6 @@ public class KatamariController : NetworkBehaviour
             SubmitNameServerRpc(desiredName);
         }
     }
-
 
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
     private void SubmitNameServerRpc(FixedString64Bytes desiredName)
