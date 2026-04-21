@@ -141,7 +141,9 @@ MonoBehaviour:
       restoreCamera: 1
       offset: {x: 0, y: 0, z: 0, w: 0}
       cameraFieldOfView: 60
-  materials: []
+  materials:
+  - {fileID: 2100000, guid: bad724506b85e4c47a1d94bef8fb9803, type: 2}
+  - {fileID: 2100000, guid: 2c4df4e0aeb14a84d8c9a1006d22d1ef, type: 2}
   autoReferenceMaterials: 1
 --- !u!114 &7833122117494664109
 MonoBehaviour:
