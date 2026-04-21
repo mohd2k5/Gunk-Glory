@@ -93,6 +93,8 @@ public class NetworkMatchTimer : NetworkBehaviour
     public void TimerEndedRPC()
     {
         Debug.Log("Match timer ended.");
+        Cursor.visible = true;
+        Cursor.lockState = CursorLockMode.None;
         UIManager.Instance.SetWindow(UIManager.Instance.endUi);
     }
 }

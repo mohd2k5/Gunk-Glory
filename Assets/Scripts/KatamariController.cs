@@ -19,7 +19,7 @@ public class KatamariController : NetworkBehaviour
     [Header("Pickup Settings")]
     [SerializeField] private GameObject primObj;
     [SerializeField] private float pickupScaleIncrease = 0.05f;
-    [SerializeField] private float minPlayerScoreDifferenceToAbsorb = 0.5f;
+    [SerializeField] private float minPlayerScoreDifferenceToAbsorb = 1f;
 
     [Header("UI")]
     [SerializeField] private TextMeshPro scoreText;
@@ -57,8 +57,6 @@ public class KatamariController : NetworkBehaviour
         rb = GetComponent<Rigidbody>();
         networkRigidbody = GetComponent<NetworkRigidbody>();
         playerInput = GetComponent<PlayerInput>();
-
-        minPlayerScoreDifferenceToAbsorb = 0.5f;
     }
 
     public override void OnNetworkSpawn()
@@ -230,7 +228,7 @@ public class KatamariController : NetworkBehaviour
         }
 
         transform.localScale += Vector3.one * pickupScaleIncrease;
-        Score.Value = KatamariSize;
+        Score.Value += 0.25f;
     }
 
     private void TryAbsorbPlayer(KatamariController otherController, GameObject otherObject)
@@ -245,7 +243,7 @@ public class KatamariController : NetworkBehaviour
             return;
         }
 
-        if ((Score.Value - otherController.Score.Value) < 0.5f)
+        if ((Score.Value - otherController.Score.Value) < minPlayerScoreDifferenceToAbsorb)
         {
             return;
         }
@@ -288,7 +286,7 @@ public class KatamariController : NetworkBehaviour
         }
 
         transform.localScale += Vector3.one * otherController.Score.Value;
-        Score.Value = KatamariSize;
+        Score.Value += 0.25f;
     }
 
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
