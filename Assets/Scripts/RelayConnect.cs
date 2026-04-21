@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using TMPro;
 using Unity.Services.Authentication;
 using Unity.Services.Core;
@@ -9,25 +7,24 @@ using UnityEngine;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using Unity.Networking.Transport.Relay;
-using Unity.Services.Multiplayer; 
+
 public class RelayConnect : MonoBehaviour
 {
     public TextMeshProUGUI joinCodeText;
     public TMP_InputField joinCodeInputField;
+
     public static RelayConnect Instance { get; private set; }
 
-    private void Awake()
+    private async void Awake()
     {
         if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
             return;
         }
-        Instance = this;
-    }
 
-    private async void Start()
-    {
+        Instance = this;
+
         await UnityServices.InitializeAsync();
 
         AuthenticationService.Instance.SignedIn += () =>
@@ -42,41 +39,74 @@ public class RelayConnect : MonoBehaviour
     {
         try
         {
+            SaveLocalPlayerName();
+
             Allocation allocation = await RelayService.Instance.CreateAllocationAsync(3);
             string joinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
-            joinCodeText.text = joinCode;
+
+            if (joinCodeText != null)
+            {
+                joinCodeText.text = joinCode;
+            }
+
             RelayServerData relayServerData = allocation.ToRelayServerData("dtls");
             NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(relayServerData);
+
             NetworkManager.Singleton.StartHost();
-            UIManager.Instance.SetWindow(UIManager.Instance.waitingMenu);
-            LocalDataSingleton.Instance.PlayerName = UIManager.Instance.playerNameInput.text;
+
+            if (UIManager.Instance != null)
+            {
+                UIManager.Instance.SetWindow(UIManager.Instance.waitingMenu);
+            }
         }
         catch (RelayServiceException e)
         {
-            Debug.Log(e);
+            Debug.LogException(e);
         }
-        
     }
 
     public async void JoinRelay()
     {
-        string joinCode = joinCodeInputField.text;
+        string joinCode = joinCodeInputField != null ? joinCodeInputField.text.Trim() : string.Empty;
+
         try
         {
+            SaveLocalPlayerName();
+
             JoinAllocation joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode);
-            
             RelayServerData relayServerData = joinAllocation.ToRelayServerData("dtls");
 
             NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(relayServerData);
             NetworkManager.Singleton.StartClient();
-            UIManager.Instance.SetWindow(UIManager.Instance.waitingMenu);
-            LocalDataSingleton.Instance.PlayerName = UIManager.Instance.playerNameInput.text;
-            joinCodeText.text = joinCode;
+
+            if (UIManager.Instance != null)
+            {
+                UIManager.Instance.SetWindow(UIManager.Instance.waitingMenu);
+            }
+
+            if (joinCodeText != null)
+            {
+                joinCodeText.text = joinCode;
+            }
         }
         catch (RelayServiceException e)
         {
-            Debug.Log(e);
+            Debug.LogException(e);
         }
-        
+    }
+
+    private void SaveLocalPlayerName()
+    {
+        if (LocalDataSingleton.Instance == null || UIManager.Instance == null)
+        {
+            return;
+        }
+
+        string enteredName = UIManager.Instance.playerNameInput != null
+            ? UIManager.Instance.playerNameInput.text
+            : string.Empty;
+
+        LocalDataSingleton.Instance.PlayerName =
+            string.IsNullOrWhiteSpace(enteredName) ? "Player" : enteredName.Trim();
     }
 }

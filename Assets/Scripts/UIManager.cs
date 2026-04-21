@@ -147,6 +147,19 @@ public class UIManager : NetworkBehaviour
         SetWindow(countdownUI);
     }
 
+    [Rpc(SendTo.Everyone, InvokePermission = RpcInvokePermission.Server)]
+    public void StartGameAfterCountdownServerRPC()
+    {
+        if (IsServer)
+        {
+            DespawnSpawnPlatforms();
+            SpawnTrashInPlayArea();
+            GameStartedNet.Value = true;
+        }
+
+        SetWindow(inGameUI);
+    }
+
     private void OnGameStartedChanged(bool oldValue, bool newValue)
     {
         if (!newValue)
@@ -191,19 +204,6 @@ public class UIManager : NetworkBehaviour
         localGameplayInitialized = true;
     }
 
-    [Rpc(SendTo.Everyone, InvokePermission = RpcInvokePermission.Server)]
-    public void StartGameAfterCountdownServerRPC()
-    {
-        if (IsServer)
-        {
-            DespawnSpawnPlatforms();
-            SpawnTrashInPlayArea();
-            GameStartedNet.Value = true;
-        }
-
-        SetWindow(inGameUI);
-    }
-
     private void UpdateWaitingPlayerCount()
     {
         if (playerCountWaiting == null || NetworkManager.Singleton == null)
@@ -216,7 +216,12 @@ public class UIManager : NetworkBehaviour
 
     private void TryStartCountdown()
     {
-        if (!IsServer || GameStartedNet.Value || countdownCoroutine != null || waitingMenu == null || !waitingMenu.activeSelf)
+        if (!IsServer || GameStartedNet.Value || countdownCoroutine != null)
+        {
+            return;
+        }
+
+        if (waitingMenu == null || !waitingMenu.activeSelf)
         {
             return;
         }
@@ -283,10 +288,15 @@ public class UIManager : NetworkBehaviour
     {
         Countdown.Value = 3;
         yield return new WaitForSeconds(1f);
+
         Countdown.Value = 2;
         yield return new WaitForSeconds(1f);
+
         Countdown.Value = 1;
         yield return new WaitForSeconds(1f);
+
+        Countdown.Value = 0;
+        yield return new WaitForSeconds(0.2f);
 
         countdownCoroutine = null;
         StartGameAfterCountdownServerRPC();
