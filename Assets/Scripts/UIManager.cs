@@ -50,7 +50,7 @@ public class UIManager : NetworkBehaviour
     public static UIManager Instance { get; private set; }
 
     private Coroutine countdownCoroutine;
-    private bool loseWindowShown;
+    private bool spectateWindowShown;
     private bool localGameplayInitialized;
 
     private void Awake()
@@ -101,7 +101,7 @@ public class UIManager : NetworkBehaviour
 
         KeepLocalInputDisabledBeforeStart();
         TryInitializeLocalGameplay();
-        TryHandleLocalPlayerLoss();
+        TryHandleLocalPlayerElimination();
     }
 
     public void StartHost()
@@ -164,6 +164,11 @@ public class UIManager : NetworkBehaviour
         foreach (GameObject player in playersList.players)
         {
             if (player == null || player == PlayerSingleton.Instance.gameObject || player == currentWatchedObject)
+            {
+                continue;
+            }
+
+            if (!player.TryGetComponent(out KatamariController controller) || controller.isEliminated.Value)
             {
                 continue;
             }
@@ -254,6 +259,11 @@ public class UIManager : NetworkBehaviour
             return;
         }
 
+        if (PlayerSingleton.Instance.TryGetComponent(out KatamariController controller) && controller.isEliminated.Value)
+        {
+            return;
+        }
+
         if (PlayerSingleton.Instance.TryGetComponent(out PlayerInput playerInput))
         {
             playerInput.enabled = true;
@@ -276,21 +286,21 @@ public class UIManager : NetworkBehaviour
         localGameplayInitialized = true;
     }
 
-    private void TryHandleLocalPlayerLoss()
+    private void TryHandleLocalPlayerElimination()
     {
-        if (!GameStartedNet.Value || loseWindowShown || PlayerSingleton.Instance == null || NetworkManager.Singleton == null)
+        if (!GameStartedNet.Value || spectateWindowShown || PlayerSingleton.Instance == null || NetworkManager.Singleton == null)
         {
             return;
         }
 
         KatamariController localController = PlayerSingleton.Instance.GetComponent<KatamariController>();
-        if (localController == null || !localController.isStick.Value)
+        if (localController == null || !localController.isEliminated.Value)
         {
             return;
         }
 
-        loseWindowShown = true;
-        SetWindow(loseUI);
+        spectateWindowShown = true;
+        SetWindow(spectateUI);
 
         PlayersList playersList = NetworkManager.Singleton.GetComponent<PlayersList>();
         if (playersList == null || NetworkFreeLook.Instance == null)
@@ -301,6 +311,11 @@ public class UIManager : NetworkBehaviour
         foreach (GameObject player in playersList.players)
         {
             if (player == null || player == PlayerSingleton.Instance.gameObject)
+            {
+                continue;
+            }
+
+            if (!player.TryGetComponent(out KatamariController controller) || controller.isEliminated.Value)
             {
                 continue;
             }
@@ -350,9 +365,9 @@ public class UIManager : NetworkBehaviour
 
     private void ApplyWindowState()
     {
-        if (loseWindowShown)
+        if (spectateWindowShown)
         {
-            SetWindow(loseUI);
+            SetWindow(spectateUI);
             return;
         }
 

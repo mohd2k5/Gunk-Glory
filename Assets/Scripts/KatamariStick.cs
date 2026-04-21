@@ -35,6 +35,7 @@ public class KatamariStick : NetworkBehaviour
     private MeshRenderer meshRenderer;
     private Rigidbody rb;
     private NetworkRigidbody networkRigidbody;
+    private NetworkTransform networkTransform;
     private Collider cachedCollider;
 
     private void Awake()
@@ -44,6 +45,7 @@ public class KatamariStick : NetworkBehaviour
         meshRenderer = GetComponent<MeshRenderer>();
         rb = GetComponent<Rigidbody>();
         networkRigidbody = GetComponent<NetworkRigidbody>();
+        networkTransform = GetComponent<NetworkTransform>();
         cachedCollider = GetComponent<Collider>();
     }
 
@@ -136,6 +138,11 @@ public class KatamariStick : NetworkBehaviour
             networkRigidbody.enabled = !stuck;
         }
 
+        if (networkTransform != null)
+        {
+            networkTransform.enabled = !stuck;
+        }
+
         if (cachedCollider != null)
         {
             cachedCollider.enabled = !stuck;
@@ -158,7 +165,7 @@ public class KatamariStick : NetworkBehaviour
     }
 
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
-    public void TransferOwnershipServerRPC(ulong newOwnerId, ulong parentId)
+    public void AttachToPlayerServerRpc(ulong parentId)
     {
         NetworkObject networkObjectComponent = GetComponent<NetworkObject>();
         if (networkObjectComponent == null || NetworkManager.Singleton == null)
@@ -192,6 +199,11 @@ public class KatamariStick : NetworkBehaviour
         if (networkRigidbody != null)
         {
             networkRigidbody.enabled = false;
+        }
+
+        if (networkTransform != null)
+        {
+            networkTransform.enabled = false;
         }
 
         if (cachedCollider != null)

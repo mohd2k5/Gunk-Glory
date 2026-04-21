@@ -40,6 +40,11 @@ public class KatamariController : NetworkBehaviour
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    public NetworkVariable<bool> isEliminated = new(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     public int ObjectCount { get; private set; }
     public float KatamariSize => transform.localScale.x;
 
@@ -47,6 +52,7 @@ public class KatamariController : NetworkBehaviour
 
     private Rigidbody rb;
     private NetworkRigidbody networkRigidbody;
+    private NetworkTransform networkTransform;
     private PlayerInput playerInput;
     private Vector2 moveInput;
     private Vector2 lookInput;
@@ -56,6 +62,7 @@ public class KatamariController : NetworkBehaviour
     {
         rb = GetComponent<Rigidbody>();
         networkRigidbody = GetComponent<NetworkRigidbody>();
+        networkTransform = GetComponent<NetworkTransform>();
         playerInput = GetComponent<PlayerInput>();
     }
 
@@ -67,6 +74,9 @@ public class KatamariController : NetworkBehaviour
         {
             pickedObjects.Add(primObj);
         }
+
+        isEliminated.OnValueChanged += OnEliminatedChanged;
+        ApplyEliminatedState(isEliminated.Value);
 
         if (!IsOwner)
         {
@@ -93,6 +103,7 @@ public class KatamariController : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
+        isEliminated.OnValueChanged -= OnEliminatedChanged;
         UnregisterFromPlayersList();
     }
 
@@ -100,7 +111,7 @@ public class KatamariController : NetworkBehaviour
     {
         RefreshUI();
 
-        if (!IsOwner || isStick.Value)
+        if (!IsOwner || isStick.Value || isEliminated.Value)
         {
             return;
         }
@@ -111,7 +122,7 @@ public class KatamariController : NetworkBehaviour
 
     private void FixedUpdate()
     {
-        if (!IsOwner || isStick.Value)
+        if (!IsOwner || isStick.Value || isEliminated.Value)
         {
             return;
         }
@@ -121,7 +132,7 @@ public class KatamariController : NetworkBehaviour
 
     public void OnMove(InputAction.CallbackContext context)
     {
-        if (!IsOwner)
+        if (!IsOwner || isEliminated.Value)
         {
             return;
         }
@@ -138,7 +149,7 @@ public class KatamariController : NetworkBehaviour
 
     public void OnLook(InputAction.CallbackContext context)
     {
-        if (!IsOwner)
+        if (!IsOwner || isEliminated.Value)
         {
             return;
         }
@@ -190,7 +201,7 @@ public class KatamariController : NetworkBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
-        if (!IsOwner || isStick.Value)
+        if (!IsOwner || isStick.Value || isEliminated.Value)
         {
             return;
         }
@@ -219,7 +230,7 @@ public class KatamariController : NetworkBehaviour
             return;
         }
 
-        stick.TransferOwnershipServerRPC(OwnerClientId, NetworkObjectId);
+        stick.AttachToPlayerServerRpc(NetworkObjectId);
 
         if (!pickedObjects.Contains(stickObject))
         {
@@ -238,7 +249,7 @@ public class KatamariController : NetworkBehaviour
             return;
         }
 
-        if (otherController == this || otherController.isStick.Value)
+        if (otherController == this || otherController.isStick.Value || otherController.isEliminated.Value)
         {
             return;
         }
@@ -248,43 +259,53 @@ public class KatamariController : NetworkBehaviour
             return;
         }
 
-        otherController.TransferOwnershipServerRPC(OwnerClientId, NetworkObjectId);
-
-        if (!pickedObjects.Contains(otherObject))
-        {
-            pickedObjects.Add(otherObject);
-            ObjectCount++;
-        }
+        otherController.EliminateServerRpc();
 
         transform.localScale += Vector3.one * otherController.Score.Value;
         Score.Value = KatamariSize;
     }
 
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
-    public void TransferOwnershipServerRPC(ulong newOwnerId, ulong parentId)
+    public void EliminateServerRpc()
     {
-        NetworkObject networkObjectComponent = GetComponent<NetworkObject>();
-        if (networkObjectComponent == null || NetworkManager.Singleton == null)
+        if (isEliminated.Value)
         {
             return;
         }
 
-        if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(parentId, out NetworkObject parentObject))
+        isEliminated.Value = true;
+    }
+
+    private void OnEliminatedChanged(bool oldValue, bool newValue)
+    {
+        ApplyEliminatedState(newValue);
+    }
+
+    private void ApplyEliminatedState(bool eliminated)
+    {
+        if (!eliminated)
         {
-            Debug.LogWarning($"KatamariController parent NetworkObject {parentId} was not found.");
             return;
         }
+
+        RemoveFromPlayersList();
+
+        moveInput = Vector2.zero;
+        lookInput = Vector2.zero;
 
         if (playerInput != null)
         {
             playerInput.enabled = false;
         }
 
-        bool parented = networkObjectComponent.TrySetParent(parentObject, true);
-        if (!parented)
+        if (networkRigidbody != null)
         {
-            Debug.LogWarning($"{name} failed to parent to {parentObject.name}");
-            return;
+            networkRigidbody.enabled = false;
+        }
+
+        if (networkTransform != null)
+        {
+            networkTransform.enabled = false;
         }
 
         if (rb != null)
@@ -297,17 +318,23 @@ public class KatamariController : NetworkBehaviour
             rb.constraints = RigidbodyConstraints.FreezeAll;
         }
 
-        if (networkRigidbody != null)
-        {
-            networkRigidbody.enabled = false;
-        }
-
-        if (TryGetComponent(out Collider colliderComponent))
+        Collider[] colliders = GetComponentsInChildren<Collider>(true);
+        foreach (Collider colliderComponent in colliders)
         {
             colliderComponent.enabled = false;
         }
 
-        isStick.Value = true;
+        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+        foreach (Renderer rendererComponent in renderers)
+        {
+            rendererComponent.enabled = false;
+        }
+
+        Canvas[] canvases = GetComponentsInChildren<Canvas>(true);
+        foreach (Canvas canvas in canvases)
+        {
+            canvas.enabled = false;
+        }
     }
 
     private void RefreshUI()
@@ -390,11 +417,10 @@ public class KatamariController : NetworkBehaviour
         hasRegisteredPlayer = true;
     }
 
-    private void UnregisterFromPlayersList()
+    private void RemoveFromPlayersList()
     {
         if (NetworkManager.Singleton == null)
         {
-            hasRegisteredPlayer = false;
             return;
         }
 
@@ -403,7 +429,11 @@ public class KatamariController : NetworkBehaviour
         {
             playersList.players.Remove(gameObject);
         }
+    }
 
+    private void UnregisterFromPlayersList()
+    {
+        RemoveFromPlayersList();
         hasRegisteredPlayer = false;
     }
 }
