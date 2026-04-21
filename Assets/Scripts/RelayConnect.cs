@@ -48,8 +48,8 @@ public class RelayConnect : MonoBehaviour
             RelayServerData relayServerData = allocation.ToRelayServerData("dtls");
             NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(relayServerData);
             NetworkManager.Singleton.StartHost();
-           // UIManager.Instance.SetWindow(UIManager.Instance.waitingMenu);
-         //   LocalDataSingleton.Instance.PlayerName = UIManager.Instance.playerNameInput.text;
+            UIManager.Instance.SetWindow(UIManager.Instance.waitingMenu);
+            LocalDataSingleton.Instance.PlayerName = UIManager.Instance.playerNameInput.text;
         }
         catch (RelayServiceException e)
         {
@@ -69,8 +69,8 @@ public class RelayConnect : MonoBehaviour
 
             NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(relayServerData);
             NetworkManager.Singleton.StartClient();
-          //  UIManager.Instance.SetWindow(UIManager.Instance.waitingMenu);
-         //   LocalDataSingleton.Instance.playerName = UIManager.Instance.playerNameInput.text;
+            UIManager.Instance.SetWindow(UIManager.Instance.waitingMenu);
+            LocalDataSingleton.Instance.PlayerName = UIManager.Instance.playerNameInput.text;
             joinCodeText.text = joinCode;
         }
         catch (RelayServiceException e)

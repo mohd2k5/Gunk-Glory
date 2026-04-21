@@ -8,21 +8,21 @@ using UnityEngine.InputSystem;
 public class UIManager : NetworkBehaviour
 {
     [Header("Windows")]
-    [SerializeField] private GameObject startMenu;
-    [SerializeField] private GameObject waitingMenu;
-    [SerializeField] private GameObject inGameUI;
-    [SerializeField] private GameObject countdownUI;
-    [SerializeField] private GameObject loseUI;
-    [SerializeField] private GameObject spectateUI;
-    [SerializeField] private List<GameObject> windows = new();
+    [SerializeField] public GameObject startMenu;
+    [SerializeField] public GameObject waitingMenu;
+    [SerializeField] public GameObject inGameUI;
+    [SerializeField] public GameObject countdownUI;
+    [SerializeField] public GameObject loseUI;
+    [SerializeField] public GameObject spectateUI;
+    [SerializeField] public List<GameObject> windows = new();
 
     [Header("Player Setup")]
-    [SerializeField] private TMP_InputField playerNameInput;
-    [SerializeField] private TextMeshProUGUI playerCountWaiting;
+    [SerializeField] public TMP_InputField playerNameInput;
+    [SerializeField] public TextMeshProUGUI playerCountWaiting;
 
     [Header("Countdown")]
-    [SerializeField] private TextMeshProUGUI countdownText;
-    [SerializeField] private int playersRequiredToStart = 2;
+    [SerializeField] public TextMeshProUGUI countdownText;
+    [SerializeField] public int playersRequiredToStart = 2;
 
     [Header("Spawning")]
     [SerializeField] private Transform[] trashSpawnPoints;
