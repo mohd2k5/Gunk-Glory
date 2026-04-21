@@ -42,7 +42,5 @@ public class CharacterSelect : MonoBehaviour
             if (indicators[i] != null)
                 indicators[i].SetActive(isSelected);
         }
-
-        CharacterSelectSingleton.Instance.skin = index;
     }
 }
