@@ -3,5 +3,5 @@ using UnityEngine;
 
 public class PlayersList : MonoBehaviour
 {
-    public List<GameObject> players = new List<GameObject>();
+    public readonly List<GameObject> players = new();
 }

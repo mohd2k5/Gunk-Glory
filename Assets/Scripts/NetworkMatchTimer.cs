@@ -1,31 +1,33 @@
+using TMPro;
 using Unity.Netcode;
 using UnityEngine;
-using TMPro;
 
 public class NetworkMatchTimer : NetworkBehaviour
 {
     [Header("Timer")]
-    [SerializeField] private float startTimeSeconds = 120f; // 2:00
-    private NetworkVariable<float> timeLeft = new NetworkVariable<float>(
-        120f,
-        NetworkVariableReadPermission.Everyone,
-        NetworkVariableWritePermission.Server
-    );
+    [SerializeField] private float startTimeSeconds = 120f;
 
     [Header("UI")]
     [SerializeField] private TMP_Text timerText;
 
-    public bool timerRunning = false;
-    
+    private readonly NetworkVariable<float> timeLeft = new(
+        120f,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    public bool timerRunning { get; set; }
+    public float TimeLeft => timeLeft.Value;
+
     public static NetworkMatchTimer Instance { get; private set; }
 
     private void Awake()
     {
         if (Instance != null && Instance != this)
         {
-            Destroy(this.gameObject);
+            Destroy(gameObject);
             return;
         }
+
         Instance = this;
         timerRunning = false;
     }
@@ -34,8 +36,7 @@ public class NetworkMatchTimer : NetworkBehaviour
     {
         if (IsServer)
         {
-            timeLeft.Value = startTimeSeconds;
-            
+            ResetTimer();
         }
 
         timeLeft.OnValueChanged += OnTimeChanged;
@@ -49,40 +50,47 @@ public class NetworkMatchTimer : NetworkBehaviour
 
     private void Update()
     {
-        if (!IsServer || !timerRunning) return;
-
-        if (timeLeft.Value > 0f)
+        if (!IsServer || !timerRunning)
         {
-            timeLeft.Value -= Time.deltaTime;
-
-            if (timeLeft.Value <= 0f)
-            {
-                timeLeft.Value = 0f;
-                timerRunning = false;
-                TimerEnded();
-            }
+            return;
         }
+
+        if (timeLeft.Value <= 0f)
+        {
+            timeLeft.Value = 0f;
+            timerRunning = false;
+            TimerEnded();
+            return;
+        }
+
+        timeLeft.Value -= Time.deltaTime;
+    }
+
+    public void ResetTimer()
+    {
+        timeLeft.Value = startTimeSeconds;
+        UpdateTimerText(timeLeft.Value);
     }
 
     private void OnTimeChanged(float oldValue, float newValue)
     {
-        UpdateTimerText(newValue);
+        UpdateTimerText(Mathf.Max(0f, newValue));
     }
 
     private void UpdateTimerText(float time)
     {
+        if (timerText == null)
+        {
+            return;
+        }
+
         int minutes = Mathf.FloorToInt(time / 60f);
         int seconds = Mathf.FloorToInt(time % 60f);
-
-        if (timerText != null)
-        {
-            timerText.text = $"{minutes:00}:{seconds:00}";
-        }
+        timerText.text = $"{minutes:00}:{seconds:00}";
     }
 
     private void TimerEnded()
     {
-        Debug.Log("Timer ended!");
-        // Put your game over logic here
+        Debug.Log("Match timer ended.");
     }
 }

@@ -278,10 +278,10 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   speed: 16
   rotationSpeed: 40
-  katamariSize: 0
-  maxObjCount: 200
-  objCount: 0
   primObj: {fileID: 0}
+  objCount: 0
+  scoreText: {fileID: 6228632862404695859}
+  nameText: {fileID: 4040374879776440211}
   Score:
     UpdateTraits:
       MinSecondsBetweenUpdates: 0
@@ -359,8 +359,6 @@ MonoBehaviour:
         byte0059: 0
         byte0060: 0
         byte0061: 0
-  scoreText: {fileID: 6228632862404695859}
-  nameText: {fileID: 4040374879776440211}
   isStick:
     UpdateTraits:
       MinSecondsBetweenUpdates: 0
