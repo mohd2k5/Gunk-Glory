@@ -87,6 +87,12 @@ public class ScoreLeaderboard : NetworkBehaviour
             .Where(x => x.controller == localController)
             .Select(x => x.index + 1)
             .FirstOrDefault();
+        
+        if (localController.isEliminated.Value)
+        {
+            localPlayerRankText.text ="#" + localController.Placement.Value.ToString()+" PLACE";
+            return;
+        }
 
         localPlayerRankText.text = "#" + rank.ToString() +" PLACE";
     }

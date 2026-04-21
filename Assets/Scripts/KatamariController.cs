@@ -44,7 +44,11 @@ public class KatamariController : NetworkBehaviour
         false,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
-
+    
+    public NetworkVariable<int> Placement = new(
+        0,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
     public int ObjectCount { get; private set; }
 
     // Scale stays fixed now, so score is the pickup-size metric.
@@ -278,6 +282,27 @@ public class KatamariController : NetworkBehaviour
             return;
         }
 
+        int activePlayers = 0;
+
+        if (NetworkManager.Singleton != null)
+        {
+            PlayersList playersList = NetworkManager.Singleton.GetComponent<PlayersList>();
+            if (playersList != null)
+            {
+                foreach (GameObject player in playersList.players)
+                {
+                    if (player == null) continue;
+
+                    if (!player.TryGetComponent(out KatamariController controller)) continue;
+                    if (controller.isEliminated.Value) continue;
+
+                    activePlayers++;
+                }
+            }
+        }
+
+        // If 4 players are still alive and this player gets eliminated now, they are place 4.
+        Placement.Value = activePlayers;
         isEliminated.Value = true;
     }
 
