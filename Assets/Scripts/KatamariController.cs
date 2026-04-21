@@ -18,8 +18,8 @@ public class KatamariController : NetworkBehaviour
 
     [Header("Pickup Settings")]
     [SerializeField] private GameObject primObj;
-    [SerializeField] private float pickupScaleIncrease = 0.05f;
     [SerializeField] private float minPlayerScoreDifferenceToAbsorb = 0.5f;
+    [SerializeField] private float scorePerTrash = 0.25f;
 
     [Header("UI")]
     [SerializeField] private TextMeshPro scoreText;
@@ -46,7 +46,9 @@ public class KatamariController : NetworkBehaviour
         NetworkVariableWritePermission.Server);
 
     public int ObjectCount { get; private set; }
-    public float KatamariSize => transform.localScale.x;
+
+    // Scale stays fixed now, so score is the pickup-size metric.
+    public float KatamariSize => Score.Value;
 
     private readonly List<GameObject> pickedObjects = new();
 
@@ -230,7 +232,11 @@ public class KatamariController : NetworkBehaviour
             return;
         }
 
-        stick.AttachToPlayerServerRpc(NetworkObjectId);
+        // Cache the exact local pose seen by the picking player.
+        Vector3 localPosition = transform.InverseTransformPoint(stickObject.transform.position);
+        Quaternion localRotation = Quaternion.Inverse(transform.rotation) * stickObject.transform.rotation;
+
+        stick.AttachToPlayerServerRpc(NetworkObjectId, localPosition, localRotation);
 
         if (!pickedObjects.Contains(stickObject))
         {
@@ -238,8 +244,7 @@ public class KatamariController : NetworkBehaviour
             ObjectCount++;
         }
 
-        transform.localScale += Vector3.one * pickupScaleIncrease;
-        Score.Value = KatamariSize;
+        Score.Value += scorePerTrash;
     }
 
     private void TryAbsorbPlayer(KatamariController otherController, GameObject otherObject)
@@ -260,9 +265,6 @@ public class KatamariController : NetworkBehaviour
         }
 
         otherController.EliminateServerRpc();
-
-        transform.localScale += Vector3.one * otherController.Score.Value;
-        Score.Value = KatamariSize;
     }
 
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
