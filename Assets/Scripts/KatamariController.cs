@@ -244,6 +244,7 @@ public class KatamariController : NetworkBehaviour
             ObjectCount++;
         }
 
+        transform.localScale += Vector3.one * (scorePerTrash / 5f);
         Score.Value += scorePerTrash;
     }
 
@@ -265,6 +266,8 @@ public class KatamariController : NetworkBehaviour
         }
 
         otherController.EliminateServerRpc();
+        transform.localScale += Vector3.one * (scorePerTrash / 5f);
+        Score.Value += scorePerTrash;
     }
 
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
