@@ -38,6 +38,10 @@ public class KatamariStick : NetworkBehaviour
     private NetworkTransform networkTransform;
     private Collider cachedCollider;
 
+    private Vector3 pendingAttachLocalPosition;
+    private Quaternion pendingAttachLocalRotation = Quaternion.identity;
+    private bool hasPendingAttachPose;
+
     private void Awake()
     {
         meshCollider = GetComponent<MeshCollider>();
@@ -157,6 +161,7 @@ public class KatamariStick : NetworkBehaviour
         {
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
+            rb.constraints = RigidbodyConstraints.FreezeAll;
         }
 
         rb.isKinematic = stuck;
@@ -165,8 +170,13 @@ public class KatamariStick : NetworkBehaviour
     }
 
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
-    public void AttachToPlayerServerRpc(ulong parentId)
+    public void AttachToPlayerServerRpc(ulong parentId, Vector3 localPosition, Quaternion localRotation)
     {
+        if (isStick.Value)
+        {
+            return;
+        }
+
         NetworkObject networkObjectComponent = GetComponent<NetworkObject>();
         if (networkObjectComponent == null || NetworkManager.Singleton == null)
         {
@@ -179,13 +189,36 @@ public class KatamariStick : NetworkBehaviour
             return;
         }
 
-        bool parented = networkObjectComponent.TrySetParent(parentObject, true);
+        pendingAttachLocalPosition = localPosition;
+        pendingAttachLocalRotation = localRotation;
+        hasPendingAttachPose = true;
+
+        bool parented = networkObjectComponent.TrySetParent(parentObject, false);
         if (!parented)
         {
+            hasPendingAttachPose = false;
             Debug.LogWarning($"{name} failed to parent to {parentObject.name}");
+        }
+    }
+
+    public override void OnNetworkObjectParentChanged(NetworkObject parentNetworkObject)
+    {
+        if (!IsServer || !hasPendingAttachPose || parentNetworkObject == null)
+        {
             return;
         }
 
+        transform.localPosition = pendingAttachLocalPosition;
+        transform.localRotation = pendingAttachLocalRotation;
+
+        FreezeAttachedState();
+
+        isStick.Value = true;
+        hasPendingAttachPose = false;
+    }
+
+    private void FreezeAttachedState()
+    {
         if (rb != null)
         {
             rb.linearVelocity = Vector3.zero;
@@ -210,7 +243,5 @@ public class KatamariStick : NetworkBehaviour
         {
             cachedCollider.enabled = false;
         }
-
-        isStick.Value = true;
     }
 }
