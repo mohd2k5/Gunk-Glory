@@ -3,9 +3,9 @@ using UnityEngine;
 public class LocalDataSingleton : MonoBehaviour
 {
     public static LocalDataSingleton Instance { get; private set; }
-    public GameObject[] SpawnPlatforms;
 
-    public string playerName;
+    [field: SerializeField] public GameObject[] SpawnPlatforms { get; private set; }
+    public string PlayerName { get; set; } = "Player";
 
     private void Awake()
     {
@@ -14,6 +14,7 @@ public class LocalDataSingleton : MonoBehaviour
             Destroy(gameObject);
             return;
         }
+
         Instance = this;
         DontDestroyOnLoad(gameObject);
     }

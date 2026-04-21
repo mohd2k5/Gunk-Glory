@@ -7,8 +7,17 @@ public class PlayerSingleton : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-        if (!IsOwner) return;
-        Instance = this;
+        if (IsOwner)
+        {
+            Instance = this;
+        }
     }
 
+    public override void OnNetworkDespawn()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+    }
 }
