@@ -5,6 +5,7 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+[RequireComponent(typeof(NetworkObject))]
 public class UIManager : NetworkBehaviour
 {
     [Header("Windows")]
@@ -15,7 +16,6 @@ public class UIManager : NetworkBehaviour
     [SerializeField] public GameObject loseUI;
     [SerializeField] public GameObject spectateUI;
     [SerializeField] public GameObject endUi;
-
     [SerializeField] public List<GameObject> windows = new();
 
     [Header("Player Setup")]
@@ -25,6 +25,7 @@ public class UIManager : NetworkBehaviour
     [Header("Countdown")]
     [SerializeField] public TextMeshProUGUI countdownText;
     [SerializeField] public int playersRequiredToStart = 2;
+    [SerializeField] private float countdownStepSeconds = 1f;
 
     [Header("Spawning")]
     [SerializeField] private Transform[] trashSpawnPoints;
@@ -33,6 +34,11 @@ public class UIManager : NetworkBehaviour
 
     public NetworkVariable<int> Countdown = new(
         3,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    public NetworkVariable<bool> CountdownActiveNet = new(
+        false,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
@@ -60,40 +66,66 @@ public class UIManager : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
+        Countdown.OnValueChanged += OnCountdownChanged;
+        CountdownActiveNet.OnValueChanged += OnCountdownActiveChanged;
         GameStartedNet.OnValueChanged += OnGameStartedChanged;
+
+        ApplyWindowState();
+        UpdateCountdownText();
     }
 
     public override void OnNetworkDespawn()
     {
+        Countdown.OnValueChanged -= OnCountdownChanged;
+        CountdownActiveNet.OnValueChanged -= OnCountdownActiveChanged;
         GameStartedNet.OnValueChanged -= OnGameStartedChanged;
     }
 
     private void Start()
     {
-        SetWindow(startMenu);
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+        {
+            SetWindow(startMenu);
+        }
     }
 
     private void Update()
     {
         UpdateWaitingPlayerCount();
-        TryStartCountdown();
-        TryHandleLocalPlayerLoss();
         UpdateCountdownText();
+
+        if (IsServer)
+        {
+            TryStartCountdown();
+        }
+
+        KeepLocalInputDisabledBeforeStart();
         TryInitializeLocalGameplay();
+        TryHandleLocalPlayerLoss();
     }
 
     public void StartHost()
     {
+        if (NetworkManager.Singleton == null)
+        {
+            return;
+        }
+
         SaveLocalPlayerName();
         NetworkManager.Singleton.StartHost();
-        SetWindow(waitingMenu);
+        ApplyWindowState();
     }
 
     public void StartClient()
     {
+        if (NetworkManager.Singleton == null)
+        {
+            return;
+        }
+
         SaveLocalPlayerName();
         NetworkManager.Singleton.StartClient();
-        SetWindow(waitingMenu);
+        ApplyWindowState();
     }
 
     public void SetWindow(GameObject window)
@@ -143,33 +175,71 @@ public class UIManager : NetworkBehaviour
         }
     }
 
-    [Rpc(SendTo.Everyone, InvokePermission = RpcInvokePermission.Server)]
-    public void SetCountdownUIServerRPC()
+    private void TryStartCountdown()
     {
-        SetWindow(countdownUI);
-    }
-
-    [Rpc(SendTo.Everyone, InvokePermission = RpcInvokePermission.Server)]
-    public void StartGameAfterCountdownServerRPC()
-    {
-        if (IsServer)
-        {
-            DespawnSpawnPlatforms();
-            SpawnTrashInPlayArea();
-            GameStartedNet.Value = true;
-        }
-
-        SetWindow(inGameUI);
-    }
-
-    private void OnGameStartedChanged(bool oldValue, bool newValue)
-    {
-        if (!newValue)
+        if (!IsServer)
         {
             return;
         }
 
-        SetWindow(inGameUI);
+        if (GameStartedNet.Value || CountdownActiveNet.Value || countdownCoroutine != null)
+        {
+            return;
+        }
+
+        if (NetworkManager.Singleton == null)
+        {
+            return;
+        }
+
+        if (NetworkManager.Singleton.ConnectedClientsList.Count < playersRequiredToStart)
+        {
+            return;
+        }
+
+        countdownCoroutine = StartCoroutine(StartCountdown());
+    }
+
+    private IEnumerator StartCountdown()
+    {
+        CountdownActiveNet.Value = true;
+
+        Countdown.Value = 3;
+        yield return new WaitForSeconds(countdownStepSeconds);
+
+        Countdown.Value = 2;
+        yield return new WaitForSeconds(countdownStepSeconds);
+
+        Countdown.Value = 1;
+        yield return new WaitForSeconds(countdownStepSeconds);
+
+        Countdown.Value = 0;
+        yield return new WaitForSeconds(0.2f);
+
+        DespawnSpawnPlatforms();
+        SpawnTrashInPlayArea();
+
+        CountdownActiveNet.Value = false;
+        GameStartedNet.Value = true;
+        countdownCoroutine = null;
+    }
+
+    private void KeepLocalInputDisabledBeforeStart()
+    {
+        if (GameStartedNet.Value)
+        {
+            return;
+        }
+
+        if (PlayerSingleton.Instance == null)
+        {
+            return;
+        }
+
+        if (PlayerSingleton.Instance.TryGetComponent(out PlayerInput playerInput))
+        {
+            playerInput.enabled = false;
+        }
     }
 
     private void TryInitializeLocalGameplay()
@@ -206,45 +276,9 @@ public class UIManager : NetworkBehaviour
         localGameplayInitialized = true;
     }
 
-    private void UpdateWaitingPlayerCount()
-    {
-        if (playerCountWaiting == null || NetworkManager.Singleton == null)
-        {
-            return;
-        }
-
-        playerCountWaiting.text = $"{NetworkManager.Singleton.ConnectedClientsList.Count}/{playersRequiredToStart}";
-    }
-
-    private void TryStartCountdown()
-    {
-        if (!IsServer || GameStartedNet.Value || countdownCoroutine != null)
-        {
-            return;
-        }
-
-        if (waitingMenu == null || !waitingMenu.activeSelf)
-        {
-            return;
-        }
-
-        if (NetworkManager.Singleton == null)
-        {
-            return;
-        }
-
-        if (NetworkManager.Singleton.ConnectedClientsList.Count < playersRequiredToStart)
-        {
-            return;
-        }
-
-        SetCountdownUIServerRPC();
-        countdownCoroutine = StartCoroutine(StartCountdown());
-    }
-
     private void TryHandleLocalPlayerLoss()
     {
-        if (loseWindowShown || PlayerSingleton.Instance == null || NetworkManager.Singleton == null)
+        if (!GameStartedNet.Value || loseWindowShown || PlayerSingleton.Instance == null || NetworkManager.Singleton == null)
         {
             return;
         }
@@ -278,34 +312,111 @@ public class UIManager : NetworkBehaviour
         }
     }
 
-    private void UpdateCountdownText()
+    private void UpdateWaitingPlayerCount()
     {
-        if (countdownText != null)
+        if (playerCountWaiting == null || NetworkManager.Singleton == null)
         {
-            countdownText.text = Countdown.Value.ToString();
+            return;
         }
+
+        playerCountWaiting.text = $"{NetworkManager.Singleton.ConnectedClientsList.Count}/{playersRequiredToStart}";
     }
 
-    private IEnumerator StartCountdown()
+    private void UpdateCountdownText()
     {
-        Countdown.Value = 3;
-        yield return new WaitForSeconds(1f);
+        if (countdownText == null)
+        {
+            return;
+        }
 
-        Countdown.Value = 2;
-        yield return new WaitForSeconds(1f);
+        countdownText.text = CountdownActiveNet.Value ? Countdown.Value.ToString() : string.Empty;
+    }
 
-        Countdown.Value = 1;
-        yield return new WaitForSeconds(1f);
+    private void OnCountdownChanged(int oldValue, int newValue)
+    {
+        UpdateCountdownText();
+    }
 
-        Countdown.Value = 0;
-        yield return new WaitForSeconds(0.2f);
+    private void OnCountdownActiveChanged(bool oldValue, bool newValue)
+    {
+        ApplyWindowState();
+        UpdateCountdownText();
+    }
 
-        countdownCoroutine = null;
-        StartGameAfterCountdownServerRPC();
+    private void OnGameStartedChanged(bool oldValue, bool newValue)
+    {
+        ApplyWindowState();
+    }
+
+    private void ApplyWindowState()
+    {
+        if (loseWindowShown)
+        {
+            SetWindow(loseUI);
+            return;
+        }
+
+        if (GameStartedNet.Value)
+        {
+            SetWindow(inGameUI);
+            return;
+        }
+
+        if (CountdownActiveNet.Value)
+        {
+            SetWindow(countdownUI);
+            return;
+        }
+
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+        {
+            SetWindow(waitingMenu);
+            return;
+        }
+
+        SetWindow(startMenu);
+    }
+
+    private void DespawnSpawnPlatforms()
+    {
+        if (!IsServer)
+        {
+            return;
+        }
+
+        if (LocalDataSingleton.Instance == null || LocalDataSingleton.Instance.SpawnPlatforms == null)
+        {
+            return;
+        }
+
+        foreach (GameObject platform in LocalDataSingleton.Instance.SpawnPlatforms)
+        {
+            if (platform == null)
+            {
+                continue;
+            }
+
+            if (!platform.TryGetComponent(out NetworkObject networkObjectComponent))
+            {
+                continue;
+            }
+
+            if (!networkObjectComponent.IsSpawned)
+            {
+                continue;
+            }
+
+            networkObjectComponent.Despawn(true);
+        }
     }
 
     private void SpawnTrashInPlayArea()
     {
+        if (!IsServer)
+        {
+            return;
+        }
+
         if (trashPrefab == null || trashSpawnPoints == null || trashSpawnPoints.Length < 4)
         {
             Debug.LogWarning("Trash spawning was skipped because prefab or spawn points are missing.");
@@ -319,24 +430,6 @@ public class UIManager : NetworkBehaviour
             trashSpawnPoints[1].position,
             trashSpawnPoints[2].position,
             trashSpawnPoints[3].position);
-    }
-
-    private void DespawnSpawnPlatforms()
-    {
-        if (LocalDataSingleton.Instance == null || LocalDataSingleton.Instance.SpawnPlatforms == null)
-        {
-            return;
-        }
-
-        foreach (GameObject platform in LocalDataSingleton.Instance.SpawnPlatforms)
-        {
-            if (platform == null || !platform.TryGetComponent(out NetworkObject networkObjectComponent) || !networkObjectComponent.IsSpawned)
-            {
-                continue;
-            }
-
-            networkObjectComponent.Despawn(true);
-        }
     }
 
     private void SaveLocalPlayerName()
