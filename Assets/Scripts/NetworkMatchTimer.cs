@@ -59,7 +59,7 @@ public class NetworkMatchTimer : NetworkBehaviour
         {
             timeLeft.Value = 0f;
             timerRunning = false;
-            TimerEnded();
+            TimerEndedRPC();
             return;
         }
 
@@ -88,9 +88,11 @@ public class NetworkMatchTimer : NetworkBehaviour
         int seconds = Mathf.FloorToInt(time % 60f);
         timerText.text = $"{minutes:00}:{seconds:00}";
     }
-
-    private void TimerEnded()
+    
+    [Rpc(SendTo.Everyone, InvokePermission = RpcInvokePermission.Server)]
+    public void TimerEndedRPC()
     {
         Debug.Log("Match timer ended.");
+        UIManager.Instance.SetWindow(UIManager.Instance.endUi);
     }
 }
