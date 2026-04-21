@@ -270,7 +270,7 @@ public class KatamariController : NetworkBehaviour
         }
 
         otherController.EliminateServerRpc();
-        transform.localScale += Vector3.one * (scorePerTrash / 5f);
+        transform.localScale += Vector3.one * scorePerTrash;
         Score.Value += scorePerTrash;
     }
 
