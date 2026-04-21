@@ -172,6 +172,21 @@ public class KatamariStick : NetworkBehaviour
             return;
         }
 
+        if (networkRigidbody != null)
+        {
+            networkRigidbody.enabled = false;
+        }
+
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.isKinematic = true;
+            rb.useGravity = false;
+            rb.detectCollisions = false;
+            rb.constraints = RigidbodyConstraints.FreezeAll;
+        }
+
         networkObjectComponent.ChangeOwnership(newOwnerId);
         networkObjectComponent.TrySetParent(parentObject, true);
         isStick.Value = true;
