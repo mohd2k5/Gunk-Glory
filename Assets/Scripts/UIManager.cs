@@ -34,11 +34,16 @@ public class UIManager : NetworkBehaviour
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    public NetworkVariable<bool> GameStartedNet = new(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     public static UIManager Instance { get; private set; }
 
     private Coroutine countdownCoroutine;
     private bool loseWindowShown;
-    private bool gameStarted;
+    private bool localGameplayInitialized;
 
     private void Awake()
     {
@@ -49,6 +54,16 @@ public class UIManager : NetworkBehaviour
         }
 
         Instance = this;
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        GameStartedNet.OnValueChanged += OnGameStartedChanged;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        GameStartedNet.OnValueChanged -= OnGameStartedChanged;
     }
 
     private void Start()
@@ -62,6 +77,7 @@ public class UIManager : NetworkBehaviour
         TryStartCountdown();
         TryHandleLocalPlayerLoss();
         UpdateCountdownText();
+        TryInitializeLocalGameplay();
     }
 
     public void StartHost()
@@ -131,6 +147,50 @@ public class UIManager : NetworkBehaviour
         SetWindow(countdownUI);
     }
 
+    private void OnGameStartedChanged(bool oldValue, bool newValue)
+    {
+        if (!newValue)
+        {
+            return;
+        }
+
+        SetWindow(inGameUI);
+    }
+
+    private void TryInitializeLocalGameplay()
+    {
+        if (!GameStartedNet.Value || localGameplayInitialized)
+        {
+            return;
+        }
+
+        if (PlayerSingleton.Instance == null)
+        {
+            return;
+        }
+
+        if (PlayerSingleton.Instance.TryGetComponent(out PlayerInput playerInput))
+        {
+            playerInput.enabled = true;
+        }
+
+        if (NetworkFreeLook.Instance != null)
+        {
+            NetworkFreeLook.Instance.SetLocalPlayer(PlayerSingleton.Instance.transform);
+        }
+
+        if (NetworkMatchTimer.Instance != null)
+        {
+            NetworkMatchTimer.Instance.timerRunning = true;
+        }
+
+        Cursor.visible = false;
+        Cursor.lockState = CursorLockMode.Locked;
+
+        SetWindow(inGameUI);
+        localGameplayInitialized = true;
+    }
+
     [Rpc(SendTo.Everyone, InvokePermission = RpcInvokePermission.Server)]
     public void StartGameAfterCountdownServerRPC()
     {
@@ -138,21 +198,10 @@ public class UIManager : NetworkBehaviour
         {
             DespawnSpawnPlatforms();
             SpawnTrashInPlayArea();
-        }
-
-        if (PlayerSingleton.Instance != null && PlayerSingleton.Instance.TryGetComponent(out PlayerInput playerInput))
-        {
-            playerInput.enabled = true;
+            GameStartedNet.Value = true;
         }
 
         SetWindow(inGameUI);
-
-        if (NetworkMatchTimer.Instance != null)
-        {
-            NetworkMatchTimer.Instance.timerRunning = true;
-        }
-
-        gameStarted = true;
     }
 
     private void UpdateWaitingPlayerCount()
@@ -167,7 +216,7 @@ public class UIManager : NetworkBehaviour
 
     private void TryStartCountdown()
     {
-        if (!IsServer || gameStarted || countdownCoroutine != null || waitingMenu == null || !waitingMenu.activeSelf)
+        if (!IsServer || GameStartedNet.Value || countdownCoroutine != null || waitingMenu == null || !waitingMenu.activeSelf)
         {
             return;
         }
