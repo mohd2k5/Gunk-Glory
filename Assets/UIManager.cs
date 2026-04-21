@@ -56,9 +56,9 @@ public class UIManager : NetworkBehaviour
     {
         if (NetworkManager.Singleton != null)
         {
-            PlayerCountWaiting.text = NetworkManager.Singleton.ConnectedClientsList.Count.ToString() + "/3";
+            PlayerCountWaiting.text = NetworkManager.Singleton.ConnectedClientsList.Count.ToString() + "/2";
             
-            if (NetworkManager.Singleton.ConnectedClientsList.Count >= 3 && waitingMenu.activeSelf && IsServer)
+            if (NetworkManager.Singleton.ConnectedClientsList.Count >= 2 && waitingMenu.activeSelf && IsServer)
             {
                 SetCountdownUIServerRPC();
                 StartCoroutine(StartCountdown());
