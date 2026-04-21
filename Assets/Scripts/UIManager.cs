@@ -14,6 +14,8 @@ public class UIManager : NetworkBehaviour
     [SerializeField] public GameObject countdownUI;
     [SerializeField] public GameObject loseUI;
     [SerializeField] public GameObject spectateUI;
+    [SerializeField] public GameObject endUi;
+
     [SerializeField] public List<GameObject> windows = new();
 
     [Header("Player Setup")]
