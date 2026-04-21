@@ -148,8 +148,14 @@ MonoBehaviour:
   objectName: placeholder
   objectMeshes:
   - {fileID: -5754084199372789682, guid: e261327e0316a2c4d8b04524bfe18d1d, type: 3}
+  - {fileID: -5754084199372789682, guid: 89e5487b4a4ed334f9fea94369e3b93f, type: 3}
+  - {fileID: -5754084199372789682, guid: 1ad8fe0bdd6e0ce47b8f5075a61aef15, type: 3}
+  - {fileID: -5754084199372789682, guid: b4143b0824a933d4ba74f757220517c2, type: 3}
   objectMaterials:
   - {fileID: 2100000, guid: 53d235b79f2323a43a393e8a661dcfd8, type: 2}
+  - {fileID: 2100000, guid: 943a29eed56bfde48baff70a4d9fc446, type: 2}
+  - {fileID: 2100000, guid: a2466b6e6edc35b499d68e81d7bd593b, type: 2}
+  - {fileID: 2100000, guid: 7d6feb00d2bd99849a40cd17b1382590, type: 2}
 --- !u!54 &1514078416422194994
 Rigidbody:
   m_ObjectHideFlags: 0

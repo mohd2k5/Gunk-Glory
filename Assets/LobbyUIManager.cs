@@ -26,14 +26,7 @@ public class LobbyUIManager : MonoBehaviour
 
     public void PlayGame()
     {
-        if (!string.IsNullOrEmpty(nextSceneName))
-        {
-            SceneManager.LoadScene(nextSceneName);
-        }
-        else
-        {
-            Debug.LogWarning("Next scene name is not set in LobbyUIManager.");
-        }
+        SceneManager.LoadScene("Game");
     }
 
     public void OpenShop()
