@@ -21,10 +21,11 @@ public class UIManager : NetworkBehaviour
     [Header("Player Setup")]
     [SerializeField] public TMP_InputField playerNameInput;
     [SerializeField] public TextMeshProUGUI playerCountWaiting;
+    [SerializeField] public TMP_InputField playersRequiredInput;
 
     [Header("Countdown")]
     [SerializeField] public TextMeshProUGUI countdownText;
-    [SerializeField] public int playersRequiredToStart = 2;
+    [SerializeField] private int defaultPlayersRequiredToStart = 2;
     [SerializeField] private float countdownStepSeconds = 1f;
 
     [Header("Spawning")]
@@ -35,23 +36,33 @@ public class UIManager : NetworkBehaviour
     public NetworkVariable<int> Countdown = new(
         3,
         NetworkVariableReadPermission.Everyone,
-        NetworkVariableWritePermission.Server);
+        NetworkVariableWritePermission.Server
+    );
 
     public NetworkVariable<bool> CountdownActiveNet = new(
         false,
         NetworkVariableReadPermission.Everyone,
-        NetworkVariableWritePermission.Server);
+        NetworkVariableWritePermission.Server
+    );
 
     public NetworkVariable<bool> GameStartedNet = new(
         false,
         NetworkVariableReadPermission.Everyone,
-        NetworkVariableWritePermission.Server);
+        NetworkVariableWritePermission.Server
+    );
+
+    public NetworkVariable<int> PlayersRequiredToStartNet = new(
+        2,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
 
     public static UIManager Instance { get; private set; }
 
     private Coroutine countdownCoroutine;
     private bool spectateWindowShown;
     private bool localGameplayInitialized;
+    private int pendingPlayersRequiredToStart;
 
     private void Awake()
     {
@@ -62,6 +73,7 @@ public class UIManager : NetworkBehaviour
         }
 
         Instance = this;
+        pendingPlayersRequiredToStart = defaultPlayersRequiredToStart;
     }
 
     public override void OnNetworkSpawn()
@@ -69,9 +81,16 @@ public class UIManager : NetworkBehaviour
         Countdown.OnValueChanged += OnCountdownChanged;
         CountdownActiveNet.OnValueChanged += OnCountdownActiveChanged;
         GameStartedNet.OnValueChanged += OnGameStartedChanged;
+        PlayersRequiredToStartNet.OnValueChanged += OnPlayersRequiredChanged;
+
+        if (IsServer)
+        {
+            PlayersRequiredToStartNet.Value = pendingPlayersRequiredToStart;
+        }
 
         ApplyWindowState();
         UpdateCountdownText();
+        UpdatePlayersRequiredInputField();
     }
 
     public override void OnNetworkDespawn()
@@ -79,10 +98,17 @@ public class UIManager : NetworkBehaviour
         Countdown.OnValueChanged -= OnCountdownChanged;
         CountdownActiveNet.OnValueChanged -= OnCountdownActiveChanged;
         GameStartedNet.OnValueChanged -= OnGameStartedChanged;
+        PlayersRequiredToStartNet.OnValueChanged -= OnPlayersRequiredChanged;
     }
 
     private void Start()
     {
+        if (playersRequiredInput != null)
+        {
+            playersRequiredInput.contentType = TMP_InputField.ContentType.IntegerNumber;
+            playersRequiredInput.text = defaultPlayersRequiredToStart.ToString();
+        }
+
         if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
         {
             SetWindow(startMenu);
@@ -112,6 +138,8 @@ public class UIManager : NetworkBehaviour
         }
 
         SaveLocalPlayerName();
+        SaveLocalPlayersRequiredCount();
+
         NetworkManager.Singleton.StartHost();
         ApplyWindowState();
     }
@@ -180,6 +208,39 @@ public class UIManager : NetworkBehaviour
         }
     }
 
+    public void SetPlayersRequiredFromInput()
+    {
+        if (playersRequiredInput == null)
+        {
+            Debug.LogWarning("Players required input field is not assigned.");
+            return;
+        }
+
+        if (!int.TryParse(playersRequiredInput.text, out int inputValue))
+        {
+            Debug.LogWarning("Invalid players required input.");
+            return;
+        }
+
+        inputValue = Mathf.Max(1, inputValue);
+        pendingPlayersRequiredToStart = inputValue;
+
+        if (IsServer)
+        {
+            PlayersRequiredToStartNet.Value = inputValue;
+        }
+        else if (IsClient && NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+        {
+            SetPlayersRequiredServerRpc(inputValue);
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void SetPlayersRequiredServerRpc(int newRequiredCount)
+    {
+        PlayersRequiredToStartNet.Value = Mathf.Max(1, newRequiredCount);
+    }
+
     private void TryStartCountdown()
     {
         if (!IsServer)
@@ -197,7 +258,7 @@ public class UIManager : NetworkBehaviour
             return;
         }
 
-        if (NetworkManager.Singleton.ConnectedClientsList.Count < playersRequiredToStart)
+        if (NetworkManager.Singleton.ConnectedClientsList.Count < PlayersRequiredToStartNet.Value)
         {
             return;
         }
@@ -334,7 +395,7 @@ public class UIManager : NetworkBehaviour
             return;
         }
 
-        playerCountWaiting.text = $"{NetworkManager.Singleton.ConnectedClientsList.Count}/{playersRequiredToStart}";
+        playerCountWaiting.text = $"{NetworkManager.Singleton.ConnectedClientsList.Count}/{PlayersRequiredToStartNet.Value}";
     }
 
     private void UpdateCountdownText()
@@ -345,6 +406,20 @@ public class UIManager : NetworkBehaviour
         }
 
         countdownText.text = CountdownActiveNet.Value ? Countdown.Value.ToString() : string.Empty;
+    }
+
+    private void UpdatePlayersRequiredInputField()
+    {
+        if (playersRequiredInput == null)
+        {
+            return;
+        }
+
+        int valueToShow = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening
+            ? PlayersRequiredToStartNet.Value
+            : pendingPlayersRequiredToStart;
+
+        playersRequiredInput.text = valueToShow.ToString();
     }
 
     private void OnCountdownChanged(int oldValue, int newValue)
@@ -361,6 +436,12 @@ public class UIManager : NetworkBehaviour
     private void OnGameStartedChanged(bool oldValue, bool newValue)
     {
         ApplyWindowState();
+    }
+
+    private void OnPlayersRequiredChanged(int oldValue, int newValue)
+    {
+        UpdatePlayersRequiredInputField();
+        UpdateWaitingPlayerCount();
     }
 
     private void ApplyWindowState()
@@ -444,7 +525,8 @@ public class UIManager : NetworkBehaviour
             trashSpawnPoints[0].position,
             trashSpawnPoints[1].position,
             trashSpawnPoints[2].position,
-            trashSpawnPoints[3].position);
+            trashSpawnPoints[3].position
+        );
     }
 
     private void SaveLocalPlayerName()
@@ -456,6 +538,23 @@ public class UIManager : NetworkBehaviour
 
         string enteredName = playerNameInput != null ? playerNameInput.text : string.Empty;
         LocalDataSingleton.Instance.PlayerName = string.IsNullOrWhiteSpace(enteredName) ? "Player" : enteredName.Trim();
+    }
+
+    private void SaveLocalPlayersRequiredCount()
+    {
+        if (playersRequiredInput == null)
+        {
+            pendingPlayersRequiredToStart = defaultPlayersRequiredToStart;
+            return;
+        }
+
+        if (!int.TryParse(playersRequiredInput.text, out int inputValue))
+        {
+            pendingPlayersRequiredToStart = defaultPlayersRequiredToStart;
+            return;
+        }
+
+        pendingPlayersRequiredToStart = Mathf.Max(1, inputValue);
     }
 
     private void SpawnRandomInQuad(GameObject prefab, int count, Vector3 p1, Vector3 p2, Vector3 p3, Vector3 p4)

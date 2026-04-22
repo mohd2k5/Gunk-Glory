@@ -50,6 +50,16 @@ public class StartGame : MonoBehaviour
             return true;
         }
 
+        // Any touch press
+        if (Touchscreen.current != null)
+        {
+            foreach (var touch in Touchscreen.current.touches)
+            {
+                if (touch.press.wasPressedThisFrame)
+                    return true;
+            }
+        }
+
         // Any common gamepad button
         foreach (var gamepad in Gamepad.all)
         {
